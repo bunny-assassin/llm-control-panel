@@ -1,0 +1,62 @@
+# Local LLM Control Panel — model registry
+# Add a model = add an entry. Launch args are the source of truth.
+# Paths below are placeholders; point them at your local weights.
+
+panel:
+  host: 0.0.0.0
+  advertised_host: auto
+  port: 8765
+  stop_timeout_sec: 30
+  health_timeout_sec: 2.0
+  metrics_interval_sec: 2.0
+  health_interval_sec: 2.0
+  # Set to a model id to load it when the panel starts (login autostart).
+  autostart_model: null
+
+models:
+  - id: qwen3.6-35b-moe
+    display_name: "Qwen3.6-35B-A3B (FP8, MoE, quality)"
+    backend: freetoken
+    port: 1919
+    host: 0.0.0.0
+    launch:
+      - ft
+      - serve
+      - --model
+      - ~/models/Qwen3.6-35B-A3B-FP8
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "1919"
+    model_path: ~/models/Qwen3.6-35B-A3B-FP8
+    quant: FP8
+    approx_disk_gb: 38
+    approx_vram_gb: 12
+    approx_ram_gb: 40
+    notes: >
+      FreeToken CPU/GPU expert offload. Official Qwen FP8 checkpoint — FreeToken
+      does not load GGUF. Run `ft bench bw` once per machine.
+
+  - id: qwen3.6-27b-dense
+    display_name: "Qwen3.6-27B (Q8_0, dense, fast/consistent)"
+    backend: llama.cpp
+    port: 8081
+    host: 0.0.0.0
+    launch:
+      - llama-server
+      - -m
+      - ~/models/Qwen_Qwen3.6-27B-Q8_0.gguf
+      - -ngl
+      - "99"
+      - -c
+      - "32768"
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8081"
+    model_path: ~/models/Qwen_Qwen3.6-27B-Q8_0.gguf
+    quant: Q8_0
+    approx_disk_gb: 29
+    approx_vram_gb: 16
+    approx_ram_gb: 32
+    notes: "Full GPU offload (-ngl 99). Only one of these two models should be loaded at a time."

@@ -1,0 +1,16 @@
+[Unit]
+Description=Local LLM Control Panel
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/projects/llm-control-panel
+Environment=PATH=%h/.local/bin:%h/.cargo/bin:/usr/local/bin:/usr/bin
+ExecStart=%h/projects/llm-control-panel/.venv/bin/llm-panel
+Restart=on-failure
+RestartSec=3
+# Only stop the panel process — never the model server it launched.
+KillMode=process
+
+[Install]
+WantedBy=default.target

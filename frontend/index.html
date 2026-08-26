@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LLM Control Panel</title>
+  <style>
+    :root {
+      --bg: #0b0d10;
+      --bg-elev: #12161c;
+      --bg-card: #171c24;
+      --line: #2a3340;
+      --line-strong: #3d4a5c;
+      --text: #e8edf4;
+      --muted: #8b97a8;
+      --faint: #5c6778;
+      --ok: #3dbe9a;
+      --ok-dim: rgba(61, 190, 154, 0.16);
+      --warn: #e6a23c;
+      --warn-dim: rgba(230, 162, 60, 0.16);
+      --bad: #e85d5d;
+      --bad-dim: rgba(232, 93, 93, 0.16);
+      --accent: #6aa7ff;
+      --accent-dim: rgba(106, 167, 255, 0.14);
+      --mono: "JetBrains Mono", "Cascadia Code", "Fira Code", ui-monospace, monospace;
+      --sans: "IBM Plex Sans", "Noto Sans", "Segoe UI", system-ui, sans-serif;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      font-family: var(--sans);
+      background:
+        radial-gradient(1200px 500px at 10% -10%, rgba(106, 167, 255, 0.08), transparent 50%),
+        radial-gradient(900px 400px at 100% 0%, rgba(61, 190, 154, 0.06), transparent 45%),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+    }
+
+    .wrap {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 20px 20px 40px;
+    }
+
+    header.top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1.15rem;
+      letter-spacing: 0.04em;
+      font-weight: 650;
+    }
+
+    .brand p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .pills { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+    .pill {
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: var(--bg-elev);
+    }
+
+    .pill.ok { color: var(--ok); border-color: rgba(61, 190, 154, 0.35); background: var(--ok-dim); }
+    .pill.warn { color: var(--warn); border-color: rgba(230, 162, 60, 0.4); background: var(--warn-dim); }
+    .pill.bad { color: var(--bad); border-color: rgba(232, 93, 93, 0.4); background: var(--bad-dim); }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: 1.4fr 1.4fr 0.8fr 0.8fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .metric {
+      background: var(--bg-card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+    }
+
+    .metric .label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .metric .value {
+      margin-top: 6px;
+      font-family: var(--mono);
+      font-size: 0.95rem;
+    }
+
+    .bar {
+      height: 8px;
+      background: #0e1318;
+      border-radius: 99px;
+      overflow: hidden;
+      margin-top: 10px;
+      border: 1px solid #1c242e;
+    }
+
+    .bar > span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--ok), var(--accent));
+      transition: width 0.4s ease, background 0.4s ease;
+    }
+
+    .bar.hot > span { background: linear-gradient(90deg, var(--warn), var(--bad)); }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .col { display: flex; flex-direction: column; gap: 12px; }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px;
+    }
+
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 0.72rem;
+      font-weight: 650;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .model {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+      background: #141920;
+    }
+
+    .model.active {
+      border-color: rgba(61, 190, 154, 0.55);
+      box-shadow: inset 0 0 0 1px rgba(61, 190, 154, 0.15);
+    }
+
+    .model.missing { opacity: 0.82; }
+
+    .model-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: flex-start;
+    }
+
+    .model h3 {
+      margin: 0;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .meta {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-family: var(--mono);
+    }
+
+    .notes {
+      margin: 8px 0 0;
+      color: var(--faint);
+      font-size: 0.78rem;
+    }
+
+    .warn-text { color: var(--warn); font-size: 0.78rem; margin-top: 8px; }
+
+    .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+
+    button, .btn {
+      appearance: none;
+      border: 1px solid var(--line-strong);
+      background: #1c2430;
+      color: var(--text);
+      border-radius: 8px;
+      padding: 7px 12px;
+      font: inherit;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+
+    button:hover:not(:disabled), .btn:hover { border-color: var(--accent); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    button.primary { background: var(--ok-dim); border-color: rgba(61, 190, 154, 0.45); color: var(--ok); }
+    button.danger { background: var(--bad-dim); border-color: rgba(232, 93, 93, 0.45); color: #ffb4b4; }
+    button.ghost { background: transparent; }
+
+    .status-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .kv {
+      background: #12171e;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+
+    .kv .k { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .kv .v { font-family: var(--mono); font-size: 0.85rem; margin-top: 2px; word-break: break-all; }
+
+    .url-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .url-row code {
+      flex: 1;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      background: #0e1318;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      overflow: auto;
+      white-space: nowrap;
+    }
+
+    textarea, input[type="text"] {
+      width: 100%;
+      background: #0e1318;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font: inherit;
+      font-size: 0.85rem;
+    }
+
+    .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+
+    .tabs button {
+      padding: 4px 9px;
+      font-size: 0.75rem;
+      border-radius: 999px;
+    }
+
+    .tabs button.on { background: var(--accent-dim); border-color: rgba(106, 167, 255, 0.5); color: var(--accent); }
+
+    pre.snippet, pre.logs, pre.result {
+      margin: 0;
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      background: #0b0f14;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    pre.logs {
+      height: 280px;
+      color: #c5d0dc;
+    }
+
+    .log-line { white-space: pre-wrap; }
+    .log-line.panel { color: var(--accent); }
+
+    .test-grid { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; }
+
+    .footer {
+      margin-top: 16px;
+      color: var(--faint);
+      font-size: 0.75rem;
+    }
+
+    .empty { color: var(--muted); font-size: 0.85rem; }
+
+    @media (max-width: 980px) {
+      .layout, .metrics, .status-row, .test-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div class="brand">
+        <h1>Local LLM Control Panel</h1>
+        <p>One model at a time on this GPU. Closing this tab does not unload the server.</p>
+      </div>
+      <div class="pills">
+        <span class="pill" id="bind-pill">…</span>
+        <span class="pill" id="conn-pill">connecting</span>
+        <span class="pill" id="run-pill">idle</span>
+      </div>
+    </header>
+
+    <section class="metrics" id="metrics">
+      <div class="metric">
+        <div class="label"><span>VRAM</span><span id="vram-label">—</span></div>
+        <div class="value" id="vram-value">waiting for nvidia-smi</div>
+        <div class="bar" id="vram-bar"><span></span></div>
+      </div>
+      <div class="metric">
+        <div class="label"><span>System RAM</span><span id="ram-label">—</span></div>
+        <div class="value" id="ram-value">—</div>
+        <div class="bar" id="ram-bar"><span></span></div>
+      </div>
+      <div class="metric">
+        <div class="label"><span>GPU util</span><span id="gpu-temp">—</span></div>
+        <div class="value" id="gpu-util">—</div>
+      </div>
+      <div class="metric">
+        <div class="label"><span>Tokens / sec</span><span>live</span></div>
+        <div class="value" id="toks">—</div>
+      </div>
+    </section>
+
+    <div class="layout">
+      <div class="col">
+        <section class="card">
+          <h2>Model registry</h2>
+          <div id="models" class="col"></div>
+          <div class="actions">
+            <button class="ghost" id="reload-btn" type="button">Reload YAML</button>
+            <button class="ghost" id="bench-btn" type="button">ft bench bw</button>
+          </div>
+        </section>
+      </div>
+
+      <div class="col">
+        <section class="card">
+          <h2>Active endpoint</h2>
+          <div class="status-row" id="status-row"></div>
+          <div class="url-row">
+            <code id="base-url">no model running</code>
+            <button type="button" id="copy-url" disabled>Copy URL</button>
+            <button type="button" id="stop-all" class="danger" disabled>Stop</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Smoke test</h2>
+          <div class="test-grid">
+            <input id="test-prompt" type="text" value="Reply with the single word: pong" />
+            <button class="primary" id="test-btn" type="button" disabled>Test chat</button>
+          </div>
+          <pre class="result" id="test-out" style="margin-top:10px">Idle. Start a model, wait until the endpoint is healthy, then test.</pre>
+        </section>
+
+        <section class="card">
+          <h2>Agent wiring</h2>
+          <div class="tabs" id="snippet-tabs"></div>
+          <pre class="snippet" id="snippet">Start a model to copy an OpenAI-compatible base URL and curl snippet.</pre>
+          <div class="actions">
+            <button type="button" id="copy-snippet" disabled>Copy snippet</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Server logs</h2>
+          <pre class="logs" id="logs"></pre>
+        </section>
+      </div>
+    </div>
+
+    <p class="footer" id="footer">
+      Listening on the LAN with no auth — don't port-forward this. Edit
+      <code>config/models.yaml</code> to add models. Optional overlay:
+      <code>config/models.local.yaml</code>.
+    </p>
+  </div>
+
+  <script>
+    const state = {
+      models: [],
+      status: { status: "idle" },
+      panel: null,
+      metrics: null,
+      logs: [],
+      snippets: null,
+      snippetKey: "curl",
+      busy: false,
+    };
+
+    const SNIPPET_TABS = [
+      ["curl", "curl"],
+      ["continue", "Continue.dev"],
+      ["aider_fish", "Aider (fish)"],
+      ["cline", "Cline"],
+      ["ft_launch", "ft launch"],
+    ];
+
+    const $ = (id) => document.getElementById(id);
+
+    function fmtUptime(sec) {
+      if (sec == null) return "—";
+      const s = Math.max(0, Number(sec));
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const r = s % 60;
+      if (h) return `${h}h ${m}m`;
+      if (m) return `${m}m ${r}s`;
+      return `${r}s`;
+    }
+
+    function setBar(id, pct, hotAt = 85) {
+      const el = $(id);
+      const span = el.querySelector("span");
+      const n = Math.max(0, Math.min(100, pct || 0));
+      span.style.width = n + "%";
+      el.classList.toggle("hot", n >= hotAt);
+    }
+
+    function pillClass(status, healthy) {
+      if (status === "running" && healthy) return "ok";
+      if (status === "starting" || status === "stopping") return "warn";
+      if (status === "error" || status === "unhealthy") return "bad";
+      return "";
+    }
+
+    async function api(path, opts = {}) {
+      const res = await fetch(path, {
+        headers: { "Content-Type": "application/json" },
+        ...opts,
+      });
+      let data = {};
+      try { data = await res.json(); } catch {}
+      if (!res.ok) {
+        const detail = data.detail;
+        const msg = typeof detail === "string" ? detail : (data.error || res.statusText);
+        throw new Error(msg);
+      }
+      return data;
+    }
+
+    function renderMetrics() {
+      const m = state.metrics || {};
+      const vram = m.vram;
+      const ram = m.ram;
+      const gpu = m.gpu;
+      if (vram && vram.total_gb != null) {
+        $("vram-value").textContent = `${vram.used_gb} / ${vram.total_gb} GB  ·  ${vram.name || ""}`.trim();
+        $("vram-label").textContent = `${vram.percent || 0}%`;
+        setBar("vram-bar", vram.percent, 80);
+      } else {
+        $("vram-value").textContent = (gpu && gpu.error) || "nvidia-smi unavailable";
+      }
+      if (ram) {
+        $("ram-value").textContent = `${ram.used_gb} / ${ram.total_gb} GB`;
+        $("ram-label").textContent = `${ram.percent}%`;
+        setBar("ram-bar", ram.percent, 90);
+      }
+      if (vram) {
+        $("gpu-util").textContent = vram.util_percent == null ? "—" : `${vram.util_percent}%`;
+        $("gpu-temp").textContent = vram.temperature_c == null ? "—" : `${vram.temperature_c}°C`;
+      }
+      const tps = state.status.tokens_per_sec;
+      $("toks").textContent = tps == null ? "—" : Number(tps).toFixed(1);
+    }
+
+    function renderHeader() {
+      const s = state.status || {};
+      const run = $("run-pill");
+      run.textContent = s.healthy ? `${s.display_name || s.model_id} · healthy` : (s.status || "idle");
+      run.className = "pill " + pillClass(s.status, s.healthy);
+      const panel = state.panel;
+      if (panel && panel.advertised_host) {
+        $("bind-pill").textContent = `${panel.advertised_host}:${panel.port}`;
+        $("bind-pill").className = panel.lan ? "pill warn" : "pill";
+      } else if (s.host) {
+        $("bind-pill").textContent = `${s.host}:${s.port || ""}`;
+      }
+    }
+
+    function renderModels() {
+      const box = $("models");
+      box.replaceChildren();
+      const activeId = state.status.model_id;
+      for (const model of state.models) {
+        const card = document.createElement("div");
+        card.className = "model" + (model.active || model.id === activeId ? " active" : "");
+        if (model.path_exists === false || model.weights_complete === false || !model.binary_found) {
+          card.classList.add("missing");
+        }
+
+        const head = document.createElement("div");
+        head.className = "model-head";
+        const title = document.createElement("h3");
+        title.textContent = model.display_name;
+        const badge = document.createElement("span");
+        badge.className = "pill " + (model.id === activeId ? pillClass(state.status.status, state.status.healthy) : "");
+        badge.textContent = model.id === activeId ? (state.status.status || "active") : model.backend;
+        head.append(title, badge);
+
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        const bits = [
+          `:${model.port}`,
+          model.quant,
+          model.approx_disk_gb != null ? `${model.approx_disk_gb} GB disk` : null,
+        ].filter(Boolean);
+        meta.textContent = bits.join("  ·  ");
+
+        const notes = document.createElement("div");
+        notes.className = "notes";
+        notes.textContent = model.notes || model.model_path || "";
+
+        card.append(head, meta, notes);
+
+        if (!model.binary_found) {
+          const w = document.createElement("div");
+          w.className = "warn-text";
+          w.textContent = `${model.binary} not found on PATH`;
+          card.append(w);
+        }
+        if (model.weights_complete === false) {
+          const w = document.createElement("div");
+          w.className = "warn-text";
+          w.textContent = model.weights_detail || `weights not ready: ${model.model_path}`;
+          card.append(w);
+        } else if (model.path_exists === false) {
+          const w = document.createElement("div");
+          w.className = "warn-text";
+          w.textContent = `weights missing: ${model.model_path}`;
+          card.append(w);
+        }
+
+        const row = document.createElement("div");
+        row.className = "actions";
+        const runningish = ["starting", "running", "stopping", "unhealthy"].includes(state.status.status);
+        const isActive = model.id === activeId && runningish;
+        const otherRunning = activeId && activeId !== model.id && runningish;
+
+        if (isActive) {
+          const stop = document.createElement("button");
+          stop.className = "danger";
+          stop.textContent = state.status.status === "stopping" ? "Stopping…" : "Stop";
+          stop.disabled = state.busy || state.status.status === "stopping";
+          stop.onclick = () => act(() => api(`/api/models/${model.id}/stop`, { method: "POST" }));
+          row.append(stop);
+        } else {
+          const go = document.createElement("button");
+          go.className = "primary";
+          go.textContent = otherRunning ? "Switch to this" : "Start";
+          go.disabled = state.busy || !model.binary_found || model.weights_complete === false;
+          go.onclick = () => act(() => api(`/api/models/${model.id}/start`, { method: "POST" }));
+          row.append(go);
+        }
+
+        const copy = document.createElement("button");
+        copy.className = "ghost";
+        copy.textContent = "Copy URL";
+        copy.onclick = () => navigator.clipboard.writeText(model.base_url);
+        row.append(copy);
+        card.append(row);
+        box.append(card);
+      }
+    }
+
+    function kv(label, value) {
+      const el = document.createElement("div");
+      el.className = "kv";
+      const k = document.createElement("div");
+      k.className = "k";
+      k.textContent = label;
+      const v = document.createElement("div");
+      v.className = "v";
+      v.textContent = value == null || value === "" ? "—" : String(value);
+      el.append(k, v);
+      return el;
+    }
+
+    function renderStatus() {
+      const s = state.status || {};
+      const row = $("status-row");
+      row.replaceChildren(
+        kv("state", s.status || "idle"),
+        kv("health", s.healthy ? "endpoint up" : (s.status === "starting" ? "loading weights" : "not serving")),
+        kv("uptime", fmtUptime(s.uptime_sec)),
+        kv("error", s.last_error || "—"),
+      );
+      const url = s.base_url || "no model running";
+      $("base-url").textContent = url;
+      $("copy-url").disabled = !s.base_url;
+      $("stop-all").disabled = !s.model_id || s.status === "idle" || s.status === "stopping" || state.busy;
+      $("test-btn").disabled = !s.healthy || state.busy;
+    }
+
+    function renderSnippets() {
+      const tabs = $("snippet-tabs");
+      tabs.replaceChildren();
+      const snip = state.snippets;
+      if (!snip) {
+        $("snippet").textContent = "Start a model to copy an OpenAI-compatible base URL and curl snippet.";
+        $("copy-snippet").disabled = true;
+        return;
+      }
+      for (const [key, label] of SNIPPET_TABS) {
+        if (key !== "curl" && !snip[key]) continue;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = label;
+        btn.className = key === state.snippetKey ? "on" : "";
+        btn.onclick = () => { state.snippetKey = key; renderSnippets(); };
+        tabs.append(btn);
+      }
+      const text = snip[state.snippetKey] || snip.curl || "";
+      $("snippet").textContent = text;
+      $("copy-snippet").disabled = !text;
+    }
+
+    function renderLogs() {
+      const pre = $("logs");
+      const stick = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 40;
+      pre.replaceChildren();
+      for (const line of state.logs.slice(-400)) {
+        const div = document.createElement("div");
+        div.className = "log-line" + (line.stream === "panel" ? " panel" : "");
+        div.textContent = line.line || "";
+        pre.append(div);
+      }
+      if (stick) pre.scrollTop = pre.scrollHeight;
+    }
+
+    function render() {
+      renderHeader();
+      renderMetrics();
+      renderModels();
+      renderStatus();
+      renderSnippets();
+      renderLogs();
+    }
+
+    async function refreshSnippets() {
+      const id = state.status.model_id;
+      if (!id) { state.snippets = null; return; }
+      try {
+        state.snippets = await api(`/api/models/${id}/snippets`);
+      } catch {
+        state.snippets = null;
+      }
+    }
+
+    async function act(fn) {
+      state.busy = true;
+      render();
+      try {
+        const out = await fn();
+        if (out && out.status) state.status = out;
+        else if (out && out.model_id) state.status = out;
+        await refreshSnippets();
+      } catch (err) {
+        $("test-out").textContent = String(err.message || err);
+        state.logs.push({ line: String(err.message || err), stream: "panel" });
+      } finally {
+        state.busy = false;
+        render();
+      }
+    }
+
+    $("copy-url").onclick = () => {
+      if (state.status.base_url) navigator.clipboard.writeText(state.status.base_url);
+    };
+    $("copy-snippet").onclick = () => {
+      const text = $("snippet").textContent;
+      if (text) navigator.clipboard.writeText(text);
+    };
+    $("stop-all").onclick = () => act(() => api("/api/stop", { method: "POST" }));
+    $("reload-btn").onclick = () => act(async () => {
+      const data = await api("/api/reload", { method: "POST" });
+      state.models = data.models || [];
+      return data;
+    });
+    $("bench-btn").onclick = () => act(async () => {
+      $("test-out").textContent = "Running ft bench bw — output streams into the log below.";
+      return api("/api/bench/bw", { method: "POST" });
+    });
+    $("test-btn").onclick = () => act(async () => {
+      $("test-out").textContent = "Waiting for completion…";
+      const out = await api("/api/test", {
+        method: "POST",
+        body: JSON.stringify({ prompt: $("test-prompt").value, max_tokens: 32 }),
+      });
+      const bits = [
+        `latency ${out.latency_ms} ms`,
+        out.tokens_per_sec != null ? `${out.tokens_per_sec} tok/s` : null,
+        `model ${out.model}`,
+      ].filter(Boolean);
+      const parts = ["OK — " + bits.join("  ·  ")];
+      parts.push("", out.content || "(no content)");
+      if (out.reasoning) parts.push("", "Reasoning:", out.reasoning);
+      $("test-out").textContent = parts.join("\n");
+      return out;
+    });
+
+    function connect() {
+      const es = new EventSource("/api/events");
+      es.addEventListener("open", () => {
+        $("conn-pill").textContent = "live";
+        $("conn-pill").className = "pill ok";
+      });
+      es.addEventListener("panel", (ev) => {
+        state.panel = JSON.parse(ev.data);
+        renderHeader();
+      });
+      es.addEventListener("hello", (ev) => {
+        const data = JSON.parse(ev.data);
+        if (data.panel) { state.panel = data.panel; renderHeader(); }
+      });
+      es.addEventListener("status", (ev) => {
+        state.status = JSON.parse(ev.data);
+        refreshSnippets().then(render);
+        render();
+      });
+      es.addEventListener("metrics", (ev) => {
+        state.metrics = JSON.parse(ev.data);
+        renderMetrics();
+        $("toks").textContent = state.status.tokens_per_sec == null ? "—" : Number(state.status.tokens_per_sec).toFixed(1);
+      });
+      es.addEventListener("log", (ev) => {
+        state.logs.push(JSON.parse(ev.data));
+        if (state.logs.length > 500) state.logs = state.logs.slice(-400);
+        renderLogs();
+      });
+      es.addEventListener("logs", (ev) => {
+        const data = JSON.parse(ev.data);
+        if (Array.isArray(data.lines) && data.lines.length) state.logs = data.lines;
+        renderLogs();
+      });
+      es.onerror = () => {
+        $("conn-pill").textContent = "reconnecting";
+        $("conn-pill").className = "pill warn";
+      };
+    }
+
+    async function boot() {
+      try {
+        const data = await api("/api/models");
+        state.models = data.models || [];
+        state.status = data.status || { status: "idle" };
+        state.panel = data.panel || null;
+        const st = await api("/api/status");
+        state.metrics = st.metrics;
+        state.status = st.status || state.status;
+        state.panel = st.panel || state.panel;
+        await refreshSnippets();
+      } catch (err) {
+        $("test-out").textContent = "Failed to reach panel API: " + err.message;
+      }
+      render();
+      connect();
+    }
+
+    boot();
+  </script>
+</body>
+</html>
