@@ -38,7 +38,7 @@ models:
       does not load GGUF. Run `ft bench bw` once per machine.
 
   - id: qwen3.6-27b-dense
-    display_name: "Qwen3.6-27B (Q8_0, dense, fast/consistent)"
+    display_name: "Qwen3.6-27B (Q8_0, dense, auto-fit GPU)"
     backend: llama.cpp
     port: 8081
     host: 0.0.0.0
@@ -46,10 +46,14 @@ models:
       - llama-server
       - -m
       - ~/models/Qwen_Qwen3.6-27B-Q8_0.gguf
-      - -ngl
-      - "99"
-      - -c
-      - "32768"
+      - --fit
+      - "on"
+      - --fit-target
+      - "1024"
+      - --fit-ctx
+      - "8192"
+      - --reasoning
+      - "off"
       - --host
       - "0.0.0.0"
       - --port
@@ -57,6 +61,11 @@ models:
     model_path: ~/models/Qwen_Qwen3.6-27B-Q8_0.gguf
     quant: Q8_0
     approx_disk_gb: 29
-    approx_vram_gb: 16
-    approx_ram_gb: 32
-    notes: "Full GPU offload (-ngl 99). Only one of these two models should be loaded at a time."
+    approx_vram_gb: 12
+    approx_ram_gb: 20
+    notes: >
+      Q8_0 is ~29 GB and cannot fully fit an RTX 5080 16 GB (needs ~26 GB VRAM
+      at -ngl 99). llama.cpp auto-fits layers onto free VRAM; the rest stays in
+      RAM. Do not set -ngl 99 on this card. Thinking is off (--reasoning off)
+      so smoke tests and agents get a visible reply instead of an empty
+      <think> budget.

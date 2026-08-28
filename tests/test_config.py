@@ -15,6 +15,12 @@ def test_default_config_loads():
     assert cfg.models[0].port != cfg.models[1].port
     assert cfg.models[0].launch[0] == "ft"
     assert cfg.models[1].launch[0] == "llama-server"
+    assert "--fit" in cfg.models[1].launch
+    assert "99" not in cfg.models[1].launch
+    fit_val = cfg.models[1].launch[cfg.models[1].launch.index("--fit") + 1]
+    assert fit_val == "on"
+    assert "--reasoning" in cfg.models[1].launch
+    assert cfg.models[1].launch[cfg.models[1].launch.index("--reasoning") + 1] == "off"
 
 
 def test_tilde_in_launch_is_expanded(tmp_path: Path):
