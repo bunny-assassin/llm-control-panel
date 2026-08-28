@@ -46,7 +46,9 @@ READY_HINTS = (
 )
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 ERROR_LINE_RE = re.compile(
-    r"(?:\bERROR\b|KeyError:|failed to open GGUF|failed to load model).{0,200}",
+    r"(?:cudaMalloc failed|out of memory|unable to allocate CUDA|"
+    r"KeyError:|failed to open GGUF|failed to load model|"
+    r"\bERROR\b).{0,220}",
     re.IGNORECASE,
 )
 
@@ -216,7 +218,11 @@ class ProcessManager:
             self.state.saw_ready = True
         err = ERROR_LINE_RE.search(line)
         if err and "futurewarning" not in lowered:
-            self.state.last_error = err.group(0).strip()[:300]
+            candidate = err.group(0).strip()[:300]
+            if candidate.lower() in {"error", "err"}:
+                pass
+            elif not self.state.last_error or len(candidate) >= len(self.state.last_error):
+                self.state.last_error = candidate
 
     def _waits_for_ready_log(self, model: ModelConfig) -> bool:
         backend = (model.backend or "").lower()
@@ -422,8 +428,9 @@ class ProcessManager:
             "stream": False,
         }
         # Qwen3.6 otherwise spends the whole budget inside <think> and returns empty content.
-        if model.backend == "freetoken":
-            payload["reasoning_effort"] = "none"
+        payload["reasoning_effort"] = "none"
+        payload["enable_thinking"] = False
+        payload["chat_template_kwargs"] = {"enable_thinking": False}
         started = time.perf_counter()
         response = await self._client().post(
             f"{model.base_url}/chat/completions",
@@ -450,8 +457,14 @@ class ProcessManager:
             choices = body.get("choices") or []
             if choices:
                 message = choices[0].get("message") or {}
-                content = message.get("content") or choices[0].get("text") or ""
-                reasoning = message.get("reasoning_content") or message.get("reasoning") or ""
+                content = (message.get("content") or choices[0].get("text") or "").strip()
+                reasoning = (
+                    message.get("reasoning_content")
+                    or message.get("reasoning")
+                    or ""
+                )
+                if isinstance(reasoning, str):
+                    reasoning = reasoning.strip()
         completion_tokens = usage.get("completion_tokens") if isinstance(usage, dict) else None
         tps = None
         if completion_tokens and latency_ms > 0:

@@ -715,8 +715,9 @@
         `model ${out.model}`,
       ].filter(Boolean);
       const parts = ["OK — " + bits.join("  ·  ")];
-      parts.push("", out.content || "(no content)");
-      if (out.reasoning) parts.push("", "Reasoning:", out.reasoning);
+      if (out.content) parts.push("", out.content);
+      else if (out.reasoning) parts.push("", "(thinking only — no final answer)", "", out.reasoning);
+      else parts.push("", "(no content — this model spent the token budget thinking; Start again after a panel refresh)");
       $("test-out").textContent = parts.join("\n");
       return out;
     });
